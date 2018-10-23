@@ -22,7 +22,6 @@ package org.sonar.php.cfg;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import org.sonar.plugins.php.api.tree.Tree;
 import org.sonar.plugins.php.api.tree.statement.ExpressionStatementTree;
 
@@ -46,8 +45,7 @@ class CfgPrinter {
     }
     for (CfgBlock block : cfg.blocks()) {
       int id = graphNodeIds.get(block);
-      Set<CfgBlock> successors = block.successors();
-      for (CfgBlock successor : successors) {
+      for (CfgBlock successor : block.successors()) {
         String edgeLabel = "";
         if (block instanceof PhpCfgBranchingBlock) {
           PhpCfgBranchingBlock branching = (PhpCfgBranchingBlock) block;
