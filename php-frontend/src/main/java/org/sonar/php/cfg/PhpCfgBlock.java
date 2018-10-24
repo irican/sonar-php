@@ -22,21 +22,27 @@ package org.sonar.php.cfg;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.sonar.plugins.php.api.tree.Tree;
 
 class PhpCfgBlock implements CfgBlock {
 
   private Set<PhpCfgBlock> predecessors = new HashSet<>();
-  private Set<PhpCfgBlock> successors;
+  protected Set<PhpCfgBlock> successors;
   private PhpCfgBlock syntacticSuccessor;
+  boolean protectFromRemoval;
 
   private LinkedList<Tree> elements = new LinkedList<>();
 
@@ -56,10 +62,6 @@ class PhpCfgBlock implements CfgBlock {
 
   PhpCfgBlock(PhpCfgBlock successor) {
     this(ImmutableSet.of(successor));
-  }
-
-  PhpCfgBlock() {
-    // needed by inheriting classes
   }
 
   @Override
@@ -93,12 +95,18 @@ class PhpCfgBlock implements CfgBlock {
    * This method is used when we remove empty blocks:
    * we have to replace empty successors in the remaining blocks by non-empty successors.
    */
-  void replaceSuccessors(Map<PhpCfgBlock, PhpCfgBlock> replacements) {
+  void replaceSuccessors(Map<PhpCfgBlock, Set<PhpCfgBlock>> replacements) {
     successors = successors.stream()
-      .map(successor -> replacement(successor, replacements))
+      .flatMap(successor -> replacement(successor, replacements))
       .collect(ImmutableSet.toImmutableSet());
-    if (syntacticSuccessor != null) {
-      syntacticSuccessor = replacement(syntacticSuccessor, replacements);
+    if (syntacticSuccessor != null && syntacticSuccessor.elements.isEmpty()) {
+      List<PhpCfgBlock> replacement = replacement(syntacticSuccessor, replacements).collect(Collectors.toList());
+      if (replacement.size() == 1) {
+        syntacticSuccessor = Iterables.getOnlyElement(replacement);
+      } else {
+        // TODO find non-empty syntactic successor
+        syntacticSuccessor = null;
+      }
     }
   }
 
@@ -106,33 +114,40 @@ class PhpCfgBlock implements CfgBlock {
    * Replace oldSucc with newSucc
    */
   void replaceSuccessor(PhpCfgBlock oldSucc, PhpCfgBlock newSucc) {
-    Map<PhpCfgBlock, PhpCfgBlock> map = new HashMap<>();
-    map.put(oldSucc, newSucc);
+    Map<PhpCfgBlock, Set<PhpCfgBlock>> map = new HashMap<>();
+    map.put(oldSucc, Collections.singleton(newSucc));
     replaceSuccessors(map);
   }
 
-  static PhpCfgBlock replacement(PhpCfgBlock successor, Map<PhpCfgBlock, PhpCfgBlock> replacements) {
-    PhpCfgBlock newSuccessor = replacements.get(successor);
-    return newSuccessor == null ? successor : newSuccessor;
+  static Stream<PhpCfgBlock> replacement(PhpCfgBlock successor, Map<PhpCfgBlock, Set<PhpCfgBlock>> replacements) {
+    Set<PhpCfgBlock> newSuccessor = replacements.get(successor);
+    return newSuccessor == null ? Stream.of(successor) : newSuccessor.stream();
   }
 
   void addPredecessor(PhpCfgBlock predecessor) {
     predecessors.add(predecessor);
   }
 
-  PhpCfgBlock skipEmptyBlocks() {
-    Set<CfgBlock> skippedBlocks = new HashSet<>();
-    PhpCfgBlock block = this;
-    while (block.successors().size() == 1 && block.elements().isEmpty()) {
-      PhpCfgBlock next = (PhpCfgBlock) block.successors().iterator().next();
-      skippedBlocks.add(block);
-      if (!skippedBlocks.contains(next)) {
-        block = next;
+  Set<PhpCfgBlock> skipEmptyBlocks() {
+    Set<PhpCfgBlock> nonEmptySuccessors = new HashSet<>();
+    Deque<PhpCfgBlock> worklist = new ArrayDeque<>(successors);
+    Set<PhpCfgBlock> processed = new HashSet<>();
+    while (!worklist.isEmpty()) {
+      PhpCfgBlock next = worklist.pop();
+      if (!processed.add(next)) {
+        continue;
+      }
+      if (next.elements.isEmpty() && !next.isEnd()) {
+        worklist.addAll(next.successors);
       } else {
-        return block;
+        nonEmptySuccessors.add(next);
       }
     }
-    return block;
+    return nonEmptySuccessors;
+  }
+
+  boolean isEnd() {
+    return false;
   }
 
   @Override

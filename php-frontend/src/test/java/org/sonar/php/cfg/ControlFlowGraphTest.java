@@ -197,13 +197,13 @@ public class ControlFlowGraphTest extends PHPTreeModelTest {
   public void try_stmt() {
     verifyBlockCfg("" +
       "try {" +
-      "  tryBody( succ = [catchBody1, catchBody2, finallyBody] );" +
+      "  tryBody( succ = [catchBody1, catchBody2, finallyBody]);" +
       "} catch (Type1 $e) {" +
       "  catchBody1( succ = [finallyBody] );" +
       "} catch (Type2 $e) {" +
       "  catchBody2( succ = [finallyBody] );" +
       "} finally {" +
-      "  finallyBody( succ = [after,END] );" +
+      "  finallyBody( succ = [after,END]);" +
       "}" +
       "after(succ = [END]);");
   }
@@ -223,17 +223,12 @@ public class ControlFlowGraphTest extends PHPTreeModelTest {
   public void try_catch() {
     ControlFlowGraph actualCfg = cfgForBlock("" +
       "try {" +
-      "  tryBody( succ = [catchBody, _empty] );" +
+      "  tryBody( succ = [catchBody, after, END]);" +
       "} catch(Exception $e) {" +
-      "  catchBody( succ = [_empty] );" +
+      "  catchBody( succ = [after, END] );" +
       "}" +
       "after( succ = [END]);");
-    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks(), expected -> {
-      expected.createEmptyBlockExpectation()
-        .withPredecessorIds("tryBody", "catchBody")
-        .withSuccessorsIds("after", "END");
-      return expected;
-    });
+    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks());
     new Validator(expectedCfgStructure).assertCfg(actualCfg);
   }
 
@@ -244,7 +239,7 @@ public class ControlFlowGraphTest extends PHPTreeModelTest {
       "  tryBody( succ = [finallyBody], syntSucc = finallyBody );" +
       "  return;" +
       "} finally {" +
-      "  finallyBody( succ = [after,END] );" +  // note that "after" is in fact not a successor, this is known limitation
+      "  finallyBody( succ = [after,END]);" +  // note that "after" is in fact not a successor, this is known limitation
       "}" +
       "after( succ = [END]);");
   }
@@ -253,21 +248,13 @@ public class ControlFlowGraphTest extends PHPTreeModelTest {
   public void try_return_catch() {
     ControlFlowGraph actualCfg = cfgForBlock("" +
       "try {" +
-      "    tryBody(succ = [_empty], pred = [], syntSucc = _empty);" +  // syntSucc should be after, but we are not able to remove _empty block
+      "    tryBody(succ = [catchBody, after, END], pred = []);" +  // missing syntactic successor
       "    return;" +
       "} catch (Exception $e) {" +
-      "    catchBody(succ=[_empty], pred = [_empty]);" +
+      "    catchBody(succ=[after, END], pred = [tryBody]);" +
       "}" +
-      "after( succ = [END], pred = [_empty]);");
-    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks(), expected -> {
-      expected.createEmptyBlockExpectation()
-        .withPredecessorIds("tryBody")
-        .withSuccessorsIds("catchBody", "_empty");  // _empty is finally block
-      expected.createEmptyBlockExpectation()
-        .withPredecessorIds("catchBody", "_empty")
-        .withSuccessorsIds("after", "END");
-      return expected;
-    });
+      "after( succ = [END], pred = [tryBody, catchBody]);");
+    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks());
     new Validator(expectedCfgStructure).assertCfg(actualCfg);
   }
 
@@ -275,22 +262,17 @@ public class ControlFlowGraphTest extends PHPTreeModelTest {
   public void try_return_catch_finally() {
     ControlFlowGraph actualCfg = cfgForBlock("" +
       "try {" +
-      "    tryBody(succ = [_empty], syntSucc = _empty);" +  // syntSucc should be finallyBody but we are not able to remove _empty
+      "    tryBody(succ = [catchBody1, catchBody2, finallyBody]);" +
       "    return;" +
       "} catch (Exception $e) {" +
-      "    catchBody1(succ=[finallyBody], pred = [_empty]);" +
+      "    catchBody1(succ=[finallyBody], pred = [tryBody]);" +
       "} catch (Exception $e) {" +
-      "    catchBody2(succ=[finallyBody], pred = [_empty]);" +
+      "    catchBody2(succ=[finallyBody], pred = [tryBody]);" +
       "} finally {" +
-      "   finallyBody(succ=[after,END], pred = [catchBody1,catchBody2,_empty]);" +
+      "   finallyBody(succ=[after,END], pred = [catchBody1,catchBody2,tryBody]);" +
       "}" +
       "after(succ = [END], pred = [finallyBody]);");
-    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks(), expected -> {
-      expected.createEmptyBlockExpectation()
-        .withPredecessorIds("tryBody")
-        .withSuccessorsIds("catchBody1", "catchBody2", "finallyBody");
-      return expected;
-    });
+    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks());
     new Validator(expectedCfgStructure).assertCfg(actualCfg);
   }
 
@@ -299,22 +281,17 @@ public class ControlFlowGraphTest extends PHPTreeModelTest {
     ControlFlowGraph actualCfg = cfgForBlock("" +
       "try { " +
       "    try {" +
-      "        tryBody(succ = [_empty], syntSucc = _empty);" +  // syntSucc should be finallyBody
+      "        tryBody(succ = [catchBody,finallyBody]);" +
       "        return;" +
       "    } catch (Exception $e) {" +
-      "        catchBody(succ=[finallyBody], pred = [_empty]);" +
+      "        catchBody(succ=[finallyBody], pred = [tryBody]);" +
       "    } finally {" +
-      "        finallyBody(succ=[outerFinallyBody], pred = [catchBody,_empty]);" +
+      "        finallyBody(succ=[outerFinallyBody], pred = [catchBody, tryBody]);" +
       "    }" +
       "} finally {" +
       "    outerFinallyBody(succ=[END], pred = [finallyBody]);" +
       "}");
-    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks(), expected -> {
-      expected.createEmptyBlockExpectation()
-        .withPredecessorIds("tryBody")
-        .withSuccessorsIds("catchBody", "finallyBody");
-      return expected;
-    });
+    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks());
     new Validator(expectedCfgStructure).assertCfg(actualCfg);
   }
 
@@ -370,15 +347,11 @@ public class ControlFlowGraphTest extends PHPTreeModelTest {
       "} catch (Type2 $e) {" +
       "  catchBody2( succ = [finallyBody] );" +
       "} finally {" +
-      "  finallyBody( succ = [END], syntSucc = _empty );" +  // syntSucc should be after, but we are not able to remove empty block
+      "  finallyBody( succ = [END] );" +  // syntSucc should be after, but we are not able to find it
       "  throw $e;" +
       "}" +
       "after( succ = [END]);");
-    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks(), expected -> {
-      expected.createEmptyBlockExpectation()
-        .withSuccessorsIds("after", "END");  // empty block created for finallyBody which is dead because of throw
-      return expected;
-    });
+    ExpectedCfgStructure expectedCfgStructure = ExpectedCfgStructure.parse(actualCfg.blocks());
     new Validator(expectedCfgStructure).assertCfg(actualCfg);
   }
 
@@ -389,25 +362,15 @@ public class ControlFlowGraphTest extends PHPTreeModelTest {
       "  try {" +
       "    innerTryBody( succ = [catchBody1], syntSucc = dead );" +
       "    throw $e;" +
-      "    dead( succ = [catchBody1, _empty]);" +
+      "    dead( succ = [catchBody1, outerTryBody, END]);" +
       "  } catch (Type $e) {" +
-      "    catchBody1( succ = [_empty] );" +
+      "    catchBody1( succ = [outerTryBody, END] );" +
       "  }" +
-      "  outerTryBody( succ = [catchBody2, _empty] );" +
+      "  outerTryBody( succ = [catchBody2, END] );" +
       "} catch (Type $e) {" +
-      "  catchBody2( succ = [_empty] );" +
+      "  catchBody2( succ = [END] );" +
       "}");
-    ExpectedCfgStructure expectedCfg = ExpectedCfgStructure.parse(actualCfg.blocks(), expected -> {
-      // inner empty finally
-      expected.createEmptyBlockExpectation()
-        .withPredecessorIds("catchBody1", "dead")
-        .withSuccessorsIds("outerTryBody", "_empty");
-      // outer empty finally
-      expected.createEmptyBlockExpectation()
-        .withPredecessorIds("outerTryBody", "catchBody2", "_empty")
-        .withSuccessorsIds("END");
-      return expected;
-    });
+    ExpectedCfgStructure expectedCfg = ExpectedCfgStructure.parse(actualCfg.blocks());
     new Validator(expectedCfg).assertCfg(actualCfg);
   }
 

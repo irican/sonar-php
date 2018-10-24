@@ -22,6 +22,7 @@ package org.sonar.php.cfg;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.Set;
 import org.sonar.plugins.php.api.tree.Tree;
 
 
@@ -30,9 +31,8 @@ import org.sonar.plugins.php.api.tree.Tree;
  */
 class PhpCfgEndBlock extends PhpCfgBlock {
 
-  @Override
-  public ImmutableSet<CfgBlock> successors() {
-    return ImmutableSet.of();
+  public PhpCfgEndBlock() {
+    super(ImmutableSet.of());
   }
 
   @Override
@@ -41,8 +41,12 @@ class PhpCfgEndBlock extends PhpCfgBlock {
   }
 
   @Override
-  public void replaceSuccessors(Map<PhpCfgBlock, PhpCfgBlock> replacements) {
+  public void replaceSuccessors(Map<PhpCfgBlock, Set<PhpCfgBlock>> replacements) {
     throw new UnsupportedOperationException("Cannot replace successors of end block");
+  }
+
+  boolean isEnd() {
+    return true;
   }
 
   @Override

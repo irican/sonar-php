@@ -19,8 +19,10 @@
  */
 package org.sonar.php.cfg;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.junit.Test;
 import org.sonar.php.PHPTreeModelTest;
 import org.sonar.php.parser.PHPLexicalGrammar;
@@ -38,8 +40,8 @@ public class PhpCfgEndBlockTest extends PHPTreeModelTest {
   @Test(expected = UnsupportedOperationException.class)
   public void cannot_replace_successors() {
     PhpCfgEndBlock endBlock = new PhpCfgEndBlock();
-    Map<PhpCfgBlock, PhpCfgBlock> map = new HashMap<>();
-    map.put(endBlock, endBlock);
+    Map<PhpCfgBlock, Set<PhpCfgBlock>> map = new HashMap<>();
+    map.put(endBlock, Collections.singleton(endBlock));
     endBlock.replaceSuccessors(map);
   }
 }

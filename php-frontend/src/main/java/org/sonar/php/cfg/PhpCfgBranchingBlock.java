@@ -22,6 +22,7 @@ package org.sonar.php.cfg;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.Set;
 import org.sonar.plugins.php.api.tree.Tree;
 
 class PhpCfgBranchingBlock extends PhpCfgBlock implements CfgBranchingBlock {
@@ -31,7 +32,8 @@ class PhpCfgBranchingBlock extends PhpCfgBlock implements CfgBranchingBlock {
 
   private Tree branchingTree;
 
-  public PhpCfgBranchingBlock(Tree branchingTree, PhpCfgBlock trueSuccessor, PhpCfgBlock falseSuccessor) {
+  PhpCfgBranchingBlock(Tree branchingTree, PhpCfgBlock trueSuccessor, PhpCfgBlock falseSuccessor) {
+    super(ImmutableSet.of(trueSuccessor, falseSuccessor));
     this.trueSuccessor = trueSuccessor;
     this.falseSuccessor = falseSuccessor;
     this.branchingTree = branchingTree;
@@ -53,13 +55,9 @@ class PhpCfgBranchingBlock extends PhpCfgBlock implements CfgBranchingBlock {
   }
 
   @Override
-  public ImmutableSet<CfgBlock> successors(){
-    return ImmutableSet.of(trueSuccessor, falseSuccessor);
-  }
-
-  @Override
-  public void replaceSuccessors(Map<PhpCfgBlock, PhpCfgBlock> replacements) {
-    this.trueSuccessor = replacement(this.trueSuccessor, replacements);
-    this.falseSuccessor = replacement(this.falseSuccessor, replacements);
+  public void replaceSuccessors(Map<PhpCfgBlock, Set<PhpCfgBlock>> replacements) {
+    this.trueSuccessor = replacement(this.trueSuccessor, replacements).findFirst().orElse(trueSuccessor);
+    this.falseSuccessor = replacement(this.falseSuccessor, replacements).findFirst().orElse(falseSuccessor);
+    successors = ImmutableSet.of(trueSuccessor, falseSuccessor);
   }
 }

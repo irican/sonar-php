@@ -23,6 +23,7 @@ package org.sonar.php.cfg;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.sonar.sslr.api.RecognitionException;
 import java.util.ArrayDeque;
@@ -103,11 +104,11 @@ class ControlFlowGraphBuilder {
   }
 
   private void removeEmptyBlocks() {
-    Map<PhpCfgBlock, PhpCfgBlock> emptyBlockReplacements = new HashMap<>();
+    Map<PhpCfgBlock, Set<PhpCfgBlock>> emptyBlockReplacements = new HashMap<>();
     for (PhpCfgBlock block : blocks) {
-      if (block.elements().isEmpty() && block.successors().size() == 1) {
-        PhpCfgBlock firstNonEmptySuccessor = block.skipEmptyBlocks();
-        emptyBlockReplacements.put(block, firstNonEmptySuccessor);
+      if (block.elements().isEmpty()) {
+        Set<PhpCfgBlock> nonEmptySuccessors = block.skipEmptyBlocks();
+        emptyBlockReplacements.put(block, nonEmptySuccessors);
       }
     }
 
@@ -117,7 +118,17 @@ class ControlFlowGraphBuilder {
       block.replaceSuccessors(emptyBlockReplacements);
     }
 
-    start = emptyBlockReplacements.getOrDefault(start, start);
+    Set<PhpCfgBlock> startReplacement = emptyBlockReplacements.get(start);
+    if (startReplacement != null) {
+      startReplacement.remove(end);
+      start = Iterables.getOnlyElement(startReplacement, start);
+    }
+
+    blocks.add(end);
+    for (PhpCfgBlock b : blocks) {
+      boolean containsAll = blocks.containsAll(b.successors);
+      Preconditions.checkState(containsAll);
+    }
   }
 
   private PhpCfgBlock build(List<? extends Tree> trees, PhpCfgBlock successor) {
@@ -214,7 +225,7 @@ class ControlFlowGraphBuilder {
 
   private PhpCfgBlock buildTryStatement(TryStatementTree tree, PhpCfgBlock successor) {
     PhpCfgBlock exitBlock = exitTargets.peek().exitBlock;
-    PhpCfgBlock finallyBlockEnd = createMultiSuccessorBlock(ImmutableSet.of(successor, exitBlock));
+    PhpCfgBlock finallyBlockEnd = createMultiSuccessorBlock(ImmutableSet.of(successor, exitBlock), null);
     PhpCfgBlock finallyBlock;
     if (tree.finallyBlock() != null) {
       finallyBlock = build(tree.finallyBlock().statements(), finallyBlockEnd);
@@ -233,7 +244,7 @@ class ControlFlowGraphBuilder {
     }
     Set<PhpCfgBlock> bodySuccessors = new HashSet<>(catchBlocks);
     bodySuccessors.add(finallyBlock);
-    PhpCfgBlock tryBodySuccessors = createMultiSuccessorBlock(bodySuccessors);
+    PhpCfgBlock tryBodySuccessors = createMultiSuccessorBlock(bodySuccessors, null);
     exitTargets.push(new TryBodyEnd(tryBodySuccessors, finallyBlock));
     PhpCfgBlock tryBodyStartingBlock = build(tree.block().statements(), tryBodySuccessors);
     throwTargets.pop();
@@ -448,8 +459,8 @@ class ControlFlowGraphBuilder {
     return block;
   }
 
-  private PhpCfgBlock createMultiSuccessorBlock(Set<PhpCfgBlock> successors) {
-    PhpCfgBlock block = new PhpCfgBlock(successors);
+  private PhpCfgBlock createMultiSuccessorBlock(Set<PhpCfgBlock> successors, PhpCfgBlock syntSucc) {
+    PhpCfgBlock block = new PhpCfgBlock(successors, syntSucc);
     blocks.add(block);
     return block;
   }
@@ -468,12 +479,14 @@ class ControlFlowGraphBuilder {
 
   private static class ForwardingBlock extends PhpCfgBlock {
 
-    private PhpCfgBlock successor;
+    ForwardingBlock() {
+      super(ImmutableSet.of());
+    }
 
     @Override
-    public ImmutableSet<CfgBlock> successors() {
-      Preconditions.checkState(successor != null, "No successor was set on %s", this);
-      return ImmutableSet.of(successor);
+    public Set<? extends CfgBlock> successors() {
+      Preconditions.checkState(!successors.isEmpty(), "No successor was set on %s", this);
+      return successors;
     }
 
     @Override
@@ -482,11 +495,11 @@ class ControlFlowGraphBuilder {
     }
 
     void setSuccessor(PhpCfgBlock successor) {
-      this.successor = successor;
+      successors = ImmutableSet.of(successor);
     }
 
     @Override
-    public void replaceSuccessors(Map<PhpCfgBlock, PhpCfgBlock> replacements) {
+    public void replaceSuccessors(Map<PhpCfgBlock, Set<PhpCfgBlock>> replacements) {
       throw new UnsupportedOperationException("Cannot replace successors for a forwarding block");
     }
   }

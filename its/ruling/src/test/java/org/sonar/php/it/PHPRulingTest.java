@@ -81,7 +81,8 @@ public class PHPRulingTest {
       .setProperty("dump.old", FileLocation.of("src/test/resources/expected").getFile().getAbsolutePath())
       .setProperty("dump.new", FileLocation.of("target/actual").getFile().getAbsolutePath())
       .setProperty("sonar.cpd.exclusions", "**/*")
-      .setProperty("lits.differences", LITS_DIFFERENCES_FILE.getAbsolutePath());
+      .setProperty("lits.differences", LITS_DIFFERENCES_FILE.getAbsolutePath())
+      .setEnvironmentVariable("JAVA_TOOL_OPTIONS", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005");
       build.setEnvironmentVariable("SONAR_RUNNER_OPTS", "-Xmx1000m");
     ORCHESTRATOR.executeBuild(build);
 

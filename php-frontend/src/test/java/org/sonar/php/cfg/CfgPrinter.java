@@ -31,6 +31,10 @@ class CfgPrinter {
     // this is an utility class and should not be instantiated
   }
 
+  static void print(ControlFlowGraph cfg) {
+    System.out.printf("digraph G { %s }", toDot(cfg));
+  }
+
   static String toDot(ControlFlowGraph cfg) {
     StringBuilder sb = new StringBuilder();
     int graphNodeId = 0;
