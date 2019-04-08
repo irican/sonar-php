@@ -8,7 +8,7 @@ function cleanPhpInMavenRepository {
 
 function configureTravis {
   mkdir -p ~/.local
-  curl -sSL https://github.com/SonarSource/travis-utils/tarball/v55 | tar zx --strip-components 1 -C ~/.local
+  curl -sSL https://github.com/SonarSource/travis-utils/tarball/01be7f1f536725cdce026352ba92453f3fc7dd95 | tar zx --strip-components 1 -C ~/.local
   source ~/.local/bin/install
 }
 
